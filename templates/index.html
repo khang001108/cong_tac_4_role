@@ -329,6 +329,8 @@
           })
       }
       loadStatus()
+      setInterval(loadStatus, 2000); // mỗi 2 giây
+
       
       // đổi tên relay khi nhấn giữ
       document.querySelectorAll('.relay-name').forEach((el) => {

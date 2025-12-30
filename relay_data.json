@@ -1,0 +1,18 @@
+{
+  "4": {
+    "name": "Relay GPIO 4",
+    "state": 1
+  },
+  "5": {
+    "name": "Relay GPIO 5",
+    "state": 0
+  },
+  "16": {
+    "name": "Relay GPIO 16",
+    "state": 0
+  },
+  "17": {
+    "name": "Relay GPIO 17",
+    "state": 0
+  }
+}
