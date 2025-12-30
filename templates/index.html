@@ -246,8 +246,25 @@
 
     <script>
       const API_BASE = 'https://cong-tac-4-role.onrender.com'
+      const PAGE_PASSWORD = '000' // 🔐 đổi mật khẩu ở đây
+      let unlocked = false
+      
       const relayState = {}
       const onTime = {}
+      
+      function checkPassword() {
+        const input = document.getElementById('passwordInput').value
+        const err = document.getElementById('pwError')
+      
+        if (input === PAGE_PASSWORD) {
+          unlocked = true
+          document.getElementById('lockPopup').style.display = 'none'
+          document.body.style.overflow = ''
+          unlockRelays() // 🔥 BẮT BUỘC
+        } else {
+          err.style.display = 'block'
+        }
+      }
       
       function applyRelay(gpio, state) {
         const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
@@ -301,6 +318,12 @@
       
       // ===== CONTROL =====
       function toggleRelay(el, gpio) {
+        if (!unlocked) {
+          alert('Vui lòng nhập mật khẩu')
+          el.checked = !el.checked
+          return
+        }
+      
         if (el.disabled) return
         el.disabled = true
         const statusEl = el.closest('.card').querySelector('.status')
@@ -326,6 +349,27 @@
           statusEl.textContent = `ON • ${Math.floor(sec / 60)}m ${sec % 60}s`
         })
       }, 1000)
+      
+      // khóa relay khi chưa mở khóa
+      document.querySelectorAll('.switch input').forEach((cb) => {
+        cb.disabled = true
+      })
+      
+      // mở khóa relay sau khi đúng mật khẩu
+      function unlockRelays() {
+        document.querySelectorAll('.switch input').forEach((cb) => {
+          cb.disabled = false
+        })
+      }
+      // nhấn Enter để mở khóa
+      document.getElementById('passwordInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          checkPassword()
+        }
+      })
     </script>
   </body>
+  <script>
+    document.body.style.overflow = 'hidden'
+  </script>
 </html>
