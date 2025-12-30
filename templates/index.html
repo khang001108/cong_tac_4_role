@@ -26,8 +26,13 @@
 <button onclick="setGPIO(4,0)">GPIO 4 OFF</button><br>
 
 <button onclick="setGPIO(5,1)">GPIO 5 ON</button>
-<button onclick="setGPIO(5,0)">GPIO 5 OFF</button>
+<button onclick="setGPIO(5,0)">GPIO 5 OFF</button><br>
 
+<button onclick="setGPIO(16,1)">GPIO 16 ON</button>
+<button onclick="setGPIO(16,0)">GPIO 16 OFF</button><br>
+
+<button onclick="setGPIO(17,1)">GPIO 17 ON</button>
+<button onclick="setGPIO(17,0)">GPIO 17 OFF</button><br>
 <script>
 function setGPIO(gpio, value) {
     fetch("/control", {
