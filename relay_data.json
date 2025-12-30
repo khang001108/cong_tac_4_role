@@ -1,7 +1,7 @@
 {
   "4": {
     "name": "Relay GPIO 4",
-    "state": 1
+    "state": 0
   },
   "5": {
     "name": "Relay GPIO 5",

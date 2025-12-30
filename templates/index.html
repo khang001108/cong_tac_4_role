@@ -244,10 +244,11 @@
     </div>
 
     <script>
+      const relayState = {}
       const API_BASE = 'https://cong-tac-4-role.onrender.com'
       const onTime = {}
       let editGPIO = null
-      const PAGE_PASSWORD = '020120'
+      const PAGE_PASSWORD = '000'
       
       // kiểm tra mật khẩu
       function checkPassword() {
@@ -285,12 +286,10 @@
           body: JSON.stringify({ gpio, value })
         })
           .then(() => {
-            if (value === 1) onTime[gpio] = Date.now()
-            else {
-              delete onTime[gpio]
-              statusEl.textContent = 'OFF'
-            }
+            // không làm gì
+            // chờ server sync
           })
+      
           .catch(() => {
             alert('❌ Lỗi kết nối server')
             el.checked = !el.checked
@@ -319,18 +318,33 @@
               const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
               if (!card) return
       
+              // ✅ tên relay (có thể update mỗi lần, không sao)
               card.querySelector('.relay-name').textContent = data[gpio].name
-              const checkbox = card.querySelector('input')
-              checkbox.checked = data[gpio].state === 1
       
-              if (data[gpio].state === 1) onTime[gpio] = Date.now()
-              else delete onTime[gpio]
+              const checkbox = card.querySelector('input')
+              const statusEl = card.querySelector('.status')
+      
+              const newState = data[gpio].state
+      
+              // ✅ CHỈ UPDATE KHI STATE THAY ĐỔI
+              if (relayState[gpio] !== newState) {
+                relayState[gpio] = newState
+      
+                checkbox.checked = newState === 1
+      
+                if (newState === 1) {
+                  onTime[gpio] = Date.now()
+                } else {
+                  delete onTime[gpio]
+                  statusEl.textContent = 'OFF'
+                }
+              }
             })
           })
       }
+      
       loadStatus()
-      setInterval(loadStatus, 2000); // mỗi 2 giây
-
+      setInterval(loadStatus, 2000) // mỗi 2 giây
       
       // đổi tên relay khi nhấn giữ
       document.querySelectorAll('.relay-name').forEach((el) => {
