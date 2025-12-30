@@ -245,201 +245,87 @@
     </div>
 
     <script>
-      const relayState = {}
       const API_BASE = 'https://cong-tac-4-role.onrender.com'
+      const relayState = {}
       const onTime = {}
-      let editGPIO = null
-      const PAGE_PASSWORD = '000'
       
-      function loadStatus() {
-        fetch(API_BASE + '/status')
-          .then((res) => res.json())
-          .then((data) => {
-            // ===== ESP32 ONLINE / OFFLINE =====
-            const espEl = document.getElementById('espStatus')
-            if (data.esp32 === 'online') {
-              espEl.textContent = '🟢 ESP32 Online'
-            } else {
-              espEl.textContent = '🔴 ESP32 Offline'
-            }
+      function applyRelay(gpio, state) {
+        const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
+        if (!card) return
       
-            // ===== RELAYS =====
-            const relays = data.relays
+        const checkbox = card.querySelector('input')
+        const statusEl = card.querySelector('.status')
       
-            Object.keys(relays).forEach((gpio) => {
-              const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
-              if (!card) return
+        checkbox.checked = state === 1
+        checkbox.disabled = false
       
-              const nameEl = card.querySelector('.relay-name')
-              const checkbox = card.querySelector('input')
-              const statusEl = card.querySelector('.status')
-      
-              const newState = relays[gpio].state
-      
-              // tên relay
-              nameEl.textContent = relays[gpio].name
-      
-              // chỉ update khi state thay đổi (chống nháy)
-              if (relayState[gpio] !== newState) {
-                relayState[gpio] = newState
-                checkbox.checked = newState === 1
-      
-                if (newState === 1) {
-                  onTime[gpio] = Date.now()
-                  statusEl.textContent = 'ON'
-                } else {
-                  delete onTime[gpio]
-                  statusEl.textContent = 'OFF'
-                }
-              }
-            })
-          })
-      }
-      
-      // kiểm tra mật khẩu
-      function checkPassword() {
-        const input = document.getElementById('passwordInput').value
-        const err = document.getElementById('pwError')
-      
-        if (input === PAGE_PASSWORD) {
-          document.getElementById('lockPopup').style.display = 'none'
-          document.body.style.overflow = ''
+        if (state === 1) {
+          if (!onTime[gpio]) onTime[gpio] = Date.now()
+          statusEl.textContent = 'ON'
         } else {
-          err.style.display = 'block'
+          delete onTime[gpio]
+          statusEl.textContent = 'OFF'
         }
       }
       
-      // chặn scroll khi chưa nhập mật khẩu
-      document.body.style.overflow = 'hidden'
+      // ===== INIT STATE =====
+      fetch(API_BASE + '/status')
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById('espStatus').textContent = data.esp32 === 'online' ? '🟢 ESP32 Online' : '🔴 ESP32 Offline'
       
-      // cho phép Enter để mở
-      document.getElementById('passwordInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') checkPassword()
-      })
+          Object.keys(data.relays).forEach((gpio) => {
+            applyRelay(gpio, data.relays[gpio].state)
+          })
+        })
       
-      // điều khiển relay
+      // ===== SSE =====
+      const evt = new EventSource(API_BASE + '/events')
+      
+      evt.onmessage = (e) => {
+        const data = JSON.parse(e.data)
+      
+        if (data.type === 'relay') {
+          applyRelay(data.gpio, data.state)
+        }
+      
+        if (data.type === 'online') {
+          document.getElementById('espStatus').textContent = '🟢 ESP32 Online'
+        }
+      
+        if (data.type === 'rename') {
+          const el = document.querySelector(`.relay-name[data-gpio="${data.gpio}"]`)
+          if (el) el.textContent = data.name
+        }
+      }
+      
+      // ===== CONTROL =====
       function toggleRelay(el, gpio) {
-        const card = el.closest('.card')
-        const statusEl = card.querySelector('.status')
-        const value = el.checked ? 1 : 0
-      
-        card.classList.add('loading')
+        if (el.disabled) return
+        el.disabled = true
+        const statusEl = el.closest('.card').querySelector('.status')
         statusEl.textContent = 'Đang gửi...'
       
         fetch(API_BASE + '/control', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gpio, value })
+          body: JSON.stringify({ gpio, value: el.checked ? 1 : 0 })
+        }).catch(() => {
+          el.disabled = false
+          statusEl.textContent = 'Lỗi'
         })
-          .then(() => {
-            // không làm gì
-            // chờ server sync
-          })
-      
-          .catch(() => {
-            alert('❌ Lỗi kết nối server')
-            el.checked = !el.checked
-          })
-          .finally(() => card.classList.remove('loading'))
       }
       
-      // cập nhật thời gian ON mỗi giây
+      // ===== TIMER =====
       setInterval(() => {
         Object.keys(onTime).forEach((gpio) => {
           const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
           if (!card) return
-      
           const statusEl = card.querySelector('.status')
           const sec = Math.floor((Date.now() - onTime[gpio]) / 1000)
           statusEl.textContent = `ON • ${Math.floor(sec / 60)}m ${sec % 60}s`
         })
       }, 1000)
-      
-      // tải trạng thái ban đầu
-      function loadStatus() {
-        fetch(API_BASE + '/status')
-          .then((res) => res.json())
-          .then((data) => {
-            Object.keys(data).forEach((gpio) => {
-              const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
-              if (!card) return
-      
-              const nameEl = card.querySelector('.relay-name')
-              const checkbox = card.querySelector('input')
-              const statusEl = card.querySelector('.status')
-      
-              const newState = data[gpio].state
-      
-              // tên relay
-              nameEl.textContent = data[gpio].name
-      
-              // 👉 chỉ update khi state đổi (chống nháy)
-              if (relayState[gpio] !== newState) {
-                relayState[gpio] = newState
-                checkbox.checked = newState === 1
-      
-                if (newState === 1) {
-                  onTime[gpio] = Date.now()
-                  statusEl.textContent = 'ON'
-                } else {
-                  delete onTime[gpio]
-                  statusEl.textContent = 'OFF'
-                }
-              }
-            })
-          })
-      }
-      
-      loadStatus()
-      setInterval(loadStatus, 2000) // mỗi 2 giây
-      
-      // đổi tên relay khi nhấn giữ
-      document.querySelectorAll('.relay-name').forEach((el) => {
-        const gpio = el.dataset.gpio
-        let pressTimer
-      
-        el.addEventListener('touchstart', () => {
-          pressTimer = setTimeout(() => openPopup(gpio), 600)
-        })
-        el.addEventListener('touchend', () => clearTimeout(pressTimer))
-        el.addEventListener('touchmove', () => clearTimeout(pressTimer))
-      
-        el.addEventListener('mousedown', () => {
-          pressTimer = setTimeout(() => openPopup(gpio), 600)
-        })
-        el.addEventListener('mouseup', () => clearTimeout(pressTimer))
-        el.addEventListener('mouseleave', () => clearTimeout(pressTimer))
-      })
-      
-      // mở popup đổi tên
-      function openPopup(gpio) {
-        editGPIO = gpio
-        document.getElementById('nameInput').value = document.querySelector(`.relay-name[data-gpio="${gpio}"]`).textContent
-      
-        document.getElementById('namePopup').style.display = 'flex'
-        document.body.style.overflow = 'hidden'
-      }
-      
-      // đóng popup
-      function closePopup() {
-        document.getElementById('namePopup').style.display = 'none'
-        document.body.style.overflow = ''
-      }
-      
-      // lưu tên mới
-      function saveName() {
-        const name = document.getElementById('nameInput').value.trim()
-        if (!name) return
-      
-        fetch(API_BASE + '/rename', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gpio: editGPIO, name })
-        }).then(() => {
-          document.querySelector(`.relay-name[data-gpio="${editGPIO}"]`).textContent = name
-          closePopup()
-        })
-      }
     </script>
   </body>
 </html>

@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import paho.mqtt.publish as publish
 import json, os, threading, time
+from queue import Queue
+from threading import Lock
 
 app = Flask(__name__)
 CORS(app)
@@ -16,8 +18,9 @@ TOPIC_ONLINE  = "esp32/khazg/online"
 ESP32_ONLINE = False
 LAST_SEEN = 0
 
-# ===== DATA FILE =====
+# ===== DATA =====
 DATA_FILE = "relay_data.json"
+data_lock = Lock()
 
 DEFAULT_DATA = {
     "4":  {"name": "Relay GPIO 4",  "state": 0},
@@ -26,32 +29,52 @@ DEFAULT_DATA = {
     "17": {"name": "Relay GPIO 17", "state": 0},
 }
 
-# ===== DATA UTILS =====
 def load_data():
-    if not os.path.exists(DATA_FILE):
-        save_data(DEFAULT_DATA)
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with data_lock:
+        if not os.path.exists(DATA_FILE):
+            save_data(DEFAULT_DATA)
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with data_lock:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ===== MQTT HANDLER =====
+# ===== SSE =====
+clients = []
+
+def push_event(payload):
+    for q in clients:
+        q.put(payload)
+
+@app.route("/events")
+def events():
+    def stream():
+        q = Queue()
+        clients.append(q)
+        try:
+            while True:
+                data = q.get()
+                yield f"data: {json.dumps(data)}\n\n"
+        except GeneratorExit:
+            clients.remove(q)
+
+    return Response(stream(), mimetype="text/event-stream")
+
+# ===== MQTT CALLBACK =====
 def on_mqtt_message(client, userdata, msg):
     global ESP32_ONLINE, LAST_SEEN
 
     payload = msg.payload.decode()
     topic = msg.topic
 
-    # ONLINE / OFFLINE
     if topic == TOPIC_ONLINE:
-        if payload == "online":
-            ESP32_ONLINE = True
-            LAST_SEEN = time.time()
+        ESP32_ONLINE = True
+        LAST_SEEN = time.time()
+        push_event({"type": "online", "status": "online"})
         return
 
-    # RELAY STATUS
     if topic == TOPIC_STATUS:
         try:
             gpio, value = payload.split(":")
@@ -65,15 +88,19 @@ def on_mqtt_message(client, userdata, msg):
             db[gpio]["state"] = value
             save_data(db)
 
-# ===== MQTT LOOP THREAD =====
+            push_event({
+                "type": "relay",
+                "gpio": gpio,
+                "state": value
+            })
+
+# ===== MQTT THREAD =====
 def mqtt_thread():
     client = mqtt.Client()
     client.on_message = on_mqtt_message
     client.connect(MQTT_BROKER, 1883, 60)
-
     client.subscribe(TOPIC_ONLINE)
     client.subscribe(TOPIC_STATUS)
-
     client.loop_forever()
 
 threading.Thread(target=mqtt_thread, daemon=True).start()
@@ -83,21 +110,22 @@ threading.Thread(target=mqtt_thread, daemon=True).start()
 def index():
     return render_template("index.html")
 
-@app.route("/status", methods=["GET"])
+@app.route("/status")
 def status():
-    data = load_data()
     online = ESP32_ONLINE and (time.time() - LAST_SEEN < 15)
-
     return jsonify({
         "esp32": "online" if online else "offline",
-        "relays": data
+        "relays": load_data()
     })
 
 @app.route("/control", methods=["POST"])
 def control():
-    data = request.json
-    gpio = data.get("gpio")
-    value = data.get("value")
+    data = request.json or {}
+    gpio = str(data.get("gpio"))
+    value = int(data.get("value", -1))
+
+    if gpio not in load_data() or value not in (0, 1):
+        return {"error": "invalid"}, 400
 
     publish.single(
         TOPIC_CONTROL,
@@ -109,23 +137,29 @@ def control():
 
 @app.route("/rename", methods=["POST"])
 def rename():
-    data = request.json
+    data = request.json or {}
     gpio = str(data.get("gpio"))
-    name = data.get("name")
+    name = data.get("name", "").strip()
 
     if not name:
         return {"error": "name required"}, 400
 
     db = load_data()
     if gpio not in db:
-        return {"error": "GPIO not found"}, 404
+        return {"error": "not found"}, 404
 
     db[gpio]["name"] = name
     save_data(db)
+
+    push_event({
+        "type": "rename",
+        "gpio": gpio,
+        "name": name
+    })
 
     return {"ok": True}
 
 # ===== RUN =====
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, threaded=True)
