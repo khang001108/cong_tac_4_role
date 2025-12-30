@@ -276,13 +276,8 @@
         checkbox.checked = state === 1
         checkbox.disabled = !unlocked
       
-        if (state === 1) {
-          if (on_since) {
-            onTime[gpio] = on_since * 1000 // UNIX giây → ms
-          } else if (!onTime[gpio]) {
-            // fallback nếu backend chưa gửi on_since
-            onTime[gpio] = Date.now()
-          }
+        if (state === 1 && on_since) {
+          onTime[gpio] = on_since * 1000
           statusEl.textContent = 'ON'
         } else {
           delete onTime[gpio]
