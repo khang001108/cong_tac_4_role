@@ -1,342 +1,382 @@
 <!DOCTYPE html>
 <html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ESP32 Relay Control</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 Relay Control</title>
 
-  <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      
+      :root {
+        --on: #22c55e;
+        --off: #ef4444;
+        --bg: #f2f4f7;
+        --card: #ffffff;
+      }
+      
+      body {
+        margin: 0;
+        font-family: system-ui, Arial;
+        background: var(--bg);
+      }
+      
+      .container {
+        max-width: 420px;
+        margin: auto;
+        padding: 16px;
+      }
+      
+      h2 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      
+      .card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 14px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .label {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      
+      .status {
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      
+      .switch {
+        position: relative;
+        width: 52px;
+        height: 30px;
+      }
+      
+      .switch input {
+        display: none;
+      }
+      
+      .slider {
+        position: absolute;
+        inset: 0;
+        background: #ccc;
+        border-radius: 30px;
+        transition: 0.25s;
+        cursor: pointer;
+      }
+      
+      .slider::before {
+        content: '';
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: 0.25s;
+      }
+      
+      input:checked + .slider {
+        background: var(--on);
+      }
+      
+      input:checked + .slider::before {
+        transform: translateX(22px);
+      }
+      
+      .loading {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+      
+      /* ===== POPUP ===== */
+      .popup {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      
+      .popup-box {
+        width: 90%;
+        max-width: 320px;
+        background: #fff;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        animation: popupIn 0.2s ease-out;
+      }
+      
+      .popup-box h4 {
+        margin: 0 0 12px;
+      }
+      
+      .popup-box input {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #ccc;
+        font-size: 15px;
+      }
+      
+      .popup-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      
+      .btn {
+        flex: 1;
+        padding: 10px;
+        border-radius: 10px;
+        border: none;
+        font-size: 15px;
+      }
+      
+      .btn.ok {
+        background: #22c55e;
+        color: #fff;
+      }
+      
+      .btn.cancel {
+        background: #e5e7eb;
+      }
+      
+      @keyframes popupIn {
+        from {
+          transform: scale(0.95);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
 
-    :root {
-      --on: #22c55e;
-      --off: #ef4444;
-      --bg: #f2f4f7;
-      --card: #ffffff;
-    }
-
-    body {
-      margin: 0;
-      font-family: system-ui, Arial;
-      background: var(--bg);
-    }
-
-    .container {
-      max-width: 420px;
-      margin: auto;
-      padding: 16px;
-    }
-
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 14px;
-      margin-bottom: 14px;
-      box-shadow: 0 8px 20px rgba(0,0,0,.08);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .label {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .status {
-      font-size: 13px;
-      opacity: .8;
-    }
-
-    .switch {
-      position: relative;
-      width: 52px;
-      height: 30px;
-    }
-
-    .switch input {
-      display: none;
-    }
-
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: #ccc;
-      border-radius: 30px;
-      transition: .25s;
-      cursor: pointer;
-    }
-
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 24px;
-      height: 24px;
-      left: 3px;
-      top: 3px;
-      background: #fff;
-      border-radius: 50%;
-      transition: .25s;
-    }
-
-    input:checked + .slider {
-      background: var(--on);
-    }
-
-    input:checked + .slider::before {
-      transform: translateX(22px);
-    }
-
-    .loading {
-      opacity: .5;
-      pointer-events: none;
-    }
-
-    /* ===== POPUP ===== */
-    .popup {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.55);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-    }
-
-    .popup-box {
-      width: 90%;
-      max-width: 320px;
-      background: #fff;
-      border-radius: 16px;
-      padding: 18px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.25);
-      animation: popupIn .2s ease-out;
-    }
-
-    .popup-box h4 {
-      margin: 0 0 12px;
-    }
-
-    .popup-box input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 15px;
-    }
-
-    .popup-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 15px;
-    }
-
-    .btn.ok {
-      background: #22c55e;
-      color: #fff;
-    }
-
-    .btn.cancel {
-      background: #e5e7eb;
-    }
-
-    @keyframes popupIn {
-      from { transform: scale(.95); opacity: 0; }
-      to   { transform: scale(1); opacity: 1; }
-    }
-  </style>
-</head>
-
-<body>
-
-<!-- POPUP -->
-<div id="namePopup" class="popup">
-  <div class="popup-box">
-    <h4>✏️ Đổi tên relay</h4>
-    <input id="nameInput" placeholder="Nhập tên relay..." />
-    <div class="popup-actions">
-      <button class="btn ok" onclick="saveName()">OK</button>
-      <button class="btn cancel" onclick="closePopup()">Huỷ</button>
+  <body>
+    <!-- PASSWORD POPUP -->
+    <div id="lockPopup" class="popup" style="display:flex">
+      <div class="popup-box">
+        <h4>🔐 Nhập mật khẩu</h4>
+        <input id="passwordInput" type="password" placeholder="Mật khẩu..." inputmode="numeric" />
+        <div class="popup-actions">
+          <button class="btn ok" onclick="checkPassword()">Mở</button>
+        </div>
+        <p id="pwError" style="color:red;font-size:13px;display:none;margin-top:8px">❌ Sai mật khẩu</p>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="container">
-  <h2>🔌 ESP32 Relay Control</h2>
-
-  <div class="card" data-gpio="4">
-    <div>
-      <div class="label relay-name" data-gpio="4">Relay GPIO 4</div>
-      <div class="status">OFF</div>
+    <!-- POPUP -->
+    <div id="namePopup" class="popup">
+      <div class="popup-box">
+        <h4>✏️ Đổi tên relay</h4>
+        <input id="nameInput" placeholder="Nhập tên relay..." />
+        <div class="popup-actions">
+          <button class="btn ok" onclick="saveName()">OK</button>
+          <button class="btn cancel" onclick="closePopup()">Huỷ</button>
+        </div>
+      </div>
     </div>
-    <label class="switch">
-      <input type="checkbox" onchange="toggleRelay(this,4)">
-      <span class="slider"></span>
-    </label>
-  </div>
 
-  <div class="card" data-gpio="5">
-    <div>
-      <div class="label relay-name" data-gpio="5">Relay GPIO 5</div>
-      <div class="status">OFF</div>
+    <div class="container">
+      <h2>🔌 ESP32 Relay Control</h2>
+
+      <div class="card" data-gpio="4">
+        <div>
+          <div class="label relay-name" data-gpio="4">Relay GPIO 4</div>
+          <div class="status">OFF</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" onchange="toggleRelay(this,4)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="card" data-gpio="5">
+        <div>
+          <div class="label relay-name" data-gpio="5">Relay GPIO 5</div>
+          <div class="status">OFF</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" onchange="toggleRelay(this,5)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="card" data-gpio="16">
+        <div>
+          <div class="label relay-name" data-gpio="16">Relay GPIO 16</div>
+          <div class="status">OFF</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" onchange="toggleRelay(this,16)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="card" data-gpio="17">
+        <div>
+          <div class="label relay-name" data-gpio="17">Relay GPIO 17</div>
+          <div class="status">OFF</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" onchange="toggleRelay(this,17)" />
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>
-    <label class="switch">
-      <input type="checkbox" onchange="toggleRelay(this,5)">
-      <span class="slider"></span>
-    </label>
-  </div>
 
-  <div class="card" data-gpio="16">
-    <div>
-      <div class="label relay-name" data-gpio="16">Relay GPIO 16</div>
-      <div class="status">OFF</div>
-    </div>
-    <label class="switch">
-      <input type="checkbox" onchange="toggleRelay(this,16)">
-      <span class="slider"></span>
-    </label>
-  </div>
-
-  <div class="card" data-gpio="17">
-    <div>
-      <div class="label relay-name" data-gpio="17">Relay GPIO 17</div>
-      <div class="status">OFF</div>
-    </div>
-    <label class="switch">
-      <input type="checkbox" onchange="toggleRelay(this,17)">
-      <span class="slider"></span>
-    </label>
-  </div>
-</div>
-
-<script>
-const API_BASE = "https://cong-tac-4-role.onrender.com";
-const onTime = {};
-let editGPIO = null;
-
-/* ===== TOGGLE RELAY ===== */
-function toggleRelay(el, gpio) {
-  const card = el.closest(".card");
-  const statusEl = card.querySelector(".status");
-  const value = el.checked ? 1 : 0;
-
-  card.classList.add("loading");
-  statusEl.textContent = "Đang gửi...";
-
-  fetch(API_BASE + "/control", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ gpio, value })
-  })
-  .then(() => {
-    if (value === 1) onTime[gpio] = Date.now();
-    else {
-      delete onTime[gpio];
-      statusEl.textContent = "OFF";
-    }
-  })
-  .catch(() => {
-    alert("❌ Lỗi kết nối server");
-    el.checked = !el.checked;
-  })
-  .finally(() => card.classList.remove("loading"));
-}
-
-/* ===== TIMER ===== */
-setInterval(() => {
-  Object.keys(onTime).forEach(gpio => {
-    const card = document.querySelector(`.card[data-gpio="${gpio}"]`);
-    if (!card) return;
-
-    const statusEl = card.querySelector(".status");
-    const sec = Math.floor((Date.now() - onTime[gpio]) / 1000);
-    statusEl.textContent = `ON • ${Math.floor(sec/60)}m ${sec%60}s`;
-  });
-}, 1000);
-
-/* ===== LOAD STATUS FROM SERVER ===== */
-function loadStatus() {
-  fetch(API_BASE + "/status")
-    .then(res => res.json())
-    .then(data => {
-      Object.keys(data).forEach(gpio => {
-        const card = document.querySelector(`.card[data-gpio="${gpio}"]`);
-        if (!card) return;
-
-        card.querySelector(".relay-name").textContent = data[gpio].name;
-        const checkbox = card.querySelector("input");
-        checkbox.checked = data[gpio].state === 1;
-
-        if (data[gpio].state === 1) onTime[gpio] = Date.now();
-        else delete onTime[gpio];
-      });
-    });
-}
-loadStatus();
-
-/* ===== LONG PRESS ===== */
-document.querySelectorAll(".relay-name").forEach(el => {
-  const gpio = el.dataset.gpio;
-  let pressTimer;
-
-  el.addEventListener("touchstart", () => {
-    pressTimer = setTimeout(() => openPopup(gpio), 600);
-  });
-  el.addEventListener("touchend", () => clearTimeout(pressTimer));
-  el.addEventListener("touchmove", () => clearTimeout(pressTimer));
-
-  el.addEventListener("mousedown", () => {
-    pressTimer = setTimeout(() => openPopup(gpio), 600);
-  });
-  el.addEventListener("mouseup", () => clearTimeout(pressTimer));
-  el.addEventListener("mouseleave", () => clearTimeout(pressTimer));
-});
-
-/* ===== POPUP ===== */
-function openPopup(gpio) {
-  editGPIO = gpio;
-  document.getElementById("nameInput").value =
-    document.querySelector(`.relay-name[data-gpio="${gpio}"]`).textContent;
-
-  document.getElementById("namePopup").style.display = "flex";
-  document.body.style.overflow = "hidden";
-}
-
-function closePopup() {
-  document.getElementById("namePopup").style.display = "none";
-  document.body.style.overflow = "";
-}
-
-function saveName() {
-  const name = document.getElementById("nameInput").value.trim();
-  if (!name) return;
-
-  fetch(API_BASE + "/rename", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ gpio: editGPIO, name })
-  })
-  .then(() => {
-    document.querySelector(`.relay-name[data-gpio="${editGPIO}"]`).textContent = name;
-    closePopup();
-  });
-}
-</script>
-
-</body>
+    <script>
+      const API_BASE = 'https://cong-tac-4-role.onrender.com'
+      const onTime = {}
+      let editGPIO = null
+      const PAGE_PASSWORD = '020120'
+      
+      // kiểm tra mật khẩu
+      function checkPassword() {
+        const input = document.getElementById('passwordInput').value
+        const err = document.getElementById('pwError')
+      
+        if (input === PAGE_PASSWORD) {
+          document.getElementById('lockPopup').style.display = 'none'
+          document.body.style.overflow = ''
+        } else {
+          err.style.display = 'block'
+        }
+      }
+      
+      // chặn scroll khi chưa nhập mật khẩu
+      document.body.style.overflow = 'hidden'
+      
+      // cho phép Enter để mở
+      document.getElementById('passwordInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkPassword()
+      })
+      
+      // điều khiển relay
+      function toggleRelay(el, gpio) {
+        const card = el.closest('.card')
+        const statusEl = card.querySelector('.status')
+        const value = el.checked ? 1 : 0
+      
+        card.classList.add('loading')
+        statusEl.textContent = 'Đang gửi...'
+      
+        fetch(API_BASE + '/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gpio, value })
+        })
+          .then(() => {
+            if (value === 1) onTime[gpio] = Date.now()
+            else {
+              delete onTime[gpio]
+              statusEl.textContent = 'OFF'
+            }
+          })
+          .catch(() => {
+            alert('❌ Lỗi kết nối server')
+            el.checked = !el.checked
+          })
+          .finally(() => card.classList.remove('loading'))
+      }
+      
+      // cập nhật thời gian ON mỗi giây
+      setInterval(() => {
+        Object.keys(onTime).forEach((gpio) => {
+          const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
+          if (!card) return
+      
+          const statusEl = card.querySelector('.status')
+          const sec = Math.floor((Date.now() - onTime[gpio]) / 1000)
+          statusEl.textContent = `ON • ${Math.floor(sec / 60)}m ${sec % 60}s`
+        })
+      }, 1000)
+      
+      // tải trạng thái ban đầu
+      function loadStatus() {
+        fetch(API_BASE + '/status')
+          .then((res) => res.json())
+          .then((data) => {
+            Object.keys(data).forEach((gpio) => {
+              const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
+              if (!card) return
+      
+              card.querySelector('.relay-name').textContent = data[gpio].name
+              const checkbox = card.querySelector('input')
+              checkbox.checked = data[gpio].state === 1
+      
+              if (data[gpio].state === 1) onTime[gpio] = Date.now()
+              else delete onTime[gpio]
+            })
+          })
+      }
+      loadStatus()
+      
+      // đổi tên relay khi nhấn giữ
+      document.querySelectorAll('.relay-name').forEach((el) => {
+        const gpio = el.dataset.gpio
+        let pressTimer
+      
+        el.addEventListener('touchstart', () => {
+          pressTimer = setTimeout(() => openPopup(gpio), 600)
+        })
+        el.addEventListener('touchend', () => clearTimeout(pressTimer))
+        el.addEventListener('touchmove', () => clearTimeout(pressTimer))
+      
+        el.addEventListener('mousedown', () => {
+          pressTimer = setTimeout(() => openPopup(gpio), 600)
+        })
+        el.addEventListener('mouseup', () => clearTimeout(pressTimer))
+        el.addEventListener('mouseleave', () => clearTimeout(pressTimer))
+      })
+      
+      // mở popup đổi tên
+      function openPopup(gpio) {
+        editGPIO = gpio
+        document.getElementById('nameInput').value = document.querySelector(`.relay-name[data-gpio="${gpio}"]`).textContent
+      
+        document.getElementById('namePopup').style.display = 'flex'
+        document.body.style.overflow = 'hidden'
+      }
+      
+      // đóng popup
+      function closePopup() {
+        document.getElementById('namePopup').style.display = 'none'
+        document.body.style.overflow = ''
+      }
+      
+      // lưu tên mới
+      function saveName() {
+        const name = document.getElementById('nameInput').value.trim()
+        if (!name) return
+      
+        fetch(API_BASE + '/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gpio: editGPIO, name })
+        }).then(() => {
+          document.querySelector(`.relay-name[data-gpio="${editGPIO}"]`).textContent = name
+          closePopup()
+        })
+      }
+    </script>
+  </body>
 </html>
