@@ -34,8 +34,10 @@
 <button onclick="setGPIO(17,1)">GPIO 17 ON</button>
 <button onclick="setGPIO(17,0)">GPIO 17 OFF</button><br>
 <script>
+const API_BASE = "https://cong-tac-4-role.onrender.com";
+
 function setGPIO(gpio, value) {
-    fetch("/control", {
+    fetch(API_BASE + "/control", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -44,9 +46,13 @@ function setGPIO(gpio, value) {
             gpio: gpio,
             value: value
         })
-    });
+    })
+    .then(res => res.json())
+    .then(data => console.log("OK:", data))
+    .catch(err => console.error("ERR:", err));
 }
 </script>
+
 
 </body>
 </html>
