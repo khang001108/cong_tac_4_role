@@ -197,6 +197,7 @@
 
     <div class="container">
       <h2>🔌 ESP32 Relay Control</h2>
+      <div id="espStatus" style="text-align:center;font-size:14px;margin-bottom:10px;">ESP32: ❓</div>
 
       <div class="card" data-gpio="4">
         <div>
@@ -249,6 +250,51 @@
       const onTime = {}
       let editGPIO = null
       const PAGE_PASSWORD = '000'
+      
+      function loadStatus() {
+        fetch(API_BASE + '/status')
+          .then((res) => res.json())
+          .then((data) => {
+            // ===== ESP32 ONLINE / OFFLINE =====
+            const espEl = document.getElementById('espStatus')
+            if (data.esp32 === 'online') {
+              espEl.textContent = '🟢 ESP32 Online'
+            } else {
+              espEl.textContent = '🔴 ESP32 Offline'
+            }
+      
+            // ===== RELAYS =====
+            const relays = data.relays
+      
+            Object.keys(relays).forEach((gpio) => {
+              const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
+              if (!card) return
+      
+              const nameEl = card.querySelector('.relay-name')
+              const checkbox = card.querySelector('input')
+              const statusEl = card.querySelector('.status')
+      
+              const newState = relays[gpio].state
+      
+              // tên relay
+              nameEl.textContent = relays[gpio].name
+      
+              // chỉ update khi state thay đổi (chống nháy)
+              if (relayState[gpio] !== newState) {
+                relayState[gpio] = newState
+                checkbox.checked = newState === 1
+      
+                if (newState === 1) {
+                  onTime[gpio] = Date.now()
+                  statusEl.textContent = 'ON'
+                } else {
+                  delete onTime[gpio]
+                  statusEl.textContent = 'OFF'
+                }
+              }
+            })
+          })
+      }
       
       // kiểm tra mật khẩu
       function checkPassword() {
@@ -318,22 +364,23 @@
               const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
               if (!card) return
       
-              // ✅ tên relay (có thể update mỗi lần, không sao)
-              card.querySelector('.relay-name').textContent = data[gpio].name
-      
+              const nameEl = card.querySelector('.relay-name')
               const checkbox = card.querySelector('input')
               const statusEl = card.querySelector('.status')
       
               const newState = data[gpio].state
       
-              // ✅ CHỈ UPDATE KHI STATE THAY ĐỔI
+              // tên relay
+              nameEl.textContent = data[gpio].name
+      
+              // 👉 chỉ update khi state đổi (chống nháy)
               if (relayState[gpio] !== newState) {
                 relayState[gpio] = newState
-      
                 checkbox.checked = newState === 1
       
                 if (newState === 1) {
                   onTime[gpio] = Date.now()
+                  statusEl.textContent = 'ON'
                 } else {
                   delete onTime[gpio]
                   statusEl.textContent = 'OFF'
