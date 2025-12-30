@@ -70,10 +70,14 @@ def on_mqtt_message(client, userdata, msg):
     topic = msg.topic
 
     if topic == TOPIC_ONLINE:
-        ESP32_ONLINE = True
+        ESP32_ONLINE = payload == "online"
         LAST_SEEN = time.time()
-        push_event({"type": "online", "status": "online"})
+        push_event({
+            "type": "online",
+            "status": payload
+        })
         return
+
 
     if topic == TOPIC_STATUS:
         try:
