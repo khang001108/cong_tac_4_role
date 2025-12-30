@@ -27,13 +27,20 @@ mqtt_client.on_message = on_message
 
 def init_mqtt():
     try:
+        mqtt_client.loop_start()                 # 🔥 chạy loop TRƯỚC
         mqtt_client.connect_async(MQTT_BROKER, MQTT_PORT, 60)
-        mqtt_client.loop_start()
         print("MQTT init done (async)")
     except Exception as e:
         print("MQTT ERROR:", e)
 
 init_mqtt()
+
+def on_disconnect(client, userdata, rc):
+    global mqtt_connected
+    mqtt_connected = False
+    print("MQTT disconnected:", rc)
+
+mqtt_client.on_disconnect = on_disconnect
 
 @app.route("/")
 def index():
