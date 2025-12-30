@@ -266,7 +266,7 @@
         }
       }
       
-      function applyRelay(gpio, state) {
+      function applyRelay(gpio, state, on_since) {
         const card = document.querySelector(`.card[data-gpio="${gpio}"]`)
         if (!card) return
       
@@ -274,10 +274,15 @@
         const statusEl = card.querySelector('.status')
       
         checkbox.checked = state === 1
-        checkbox.disabled = false
+        checkbox.disabled = !unlocked
       
         if (state === 1) {
-          if (!onTime[gpio]) onTime[gpio] = Date.now()
+          if (on_since) {
+            onTime[gpio] = on_since * 1000 // UNIX giây → ms
+          } else if (!onTime[gpio]) {
+            // fallback nếu backend chưa gửi on_since
+            onTime[gpio] = Date.now()
+          }
           statusEl.textContent = 'ON'
         } else {
           delete onTime[gpio]
@@ -289,10 +294,16 @@
       fetch(API_BASE + '/status')
         .then((r) => r.json())
         .then((data) => {
-          document.getElementById('espStatus').textContent = data.esp32 === 'online' ? '🟢 ESP32 Online' : '🔴 ESP32 Offline'
+          const online = data.esp32 === 'online'
+          document.getElementById('espStatus').textContent = online ? '🟢 ESP32 Online' : '🔴 ESP32 Offline'
       
           Object.keys(data.relays).forEach((gpio) => {
-            applyRelay(gpio, data.relays[gpio].state)
+            const r = data.relays[gpio]
+            applyRelay(gpio, r.state, r.on_since)
+          })
+      
+          document.querySelectorAll('.switch input').forEach((cb) => {
+            cb.disabled = !online || !unlocked
           })
         })
       
@@ -303,7 +314,7 @@
         const data = JSON.parse(e.data)
       
         if (data.type === 'relay') {
-          applyRelay(data.gpio, data.state)
+          applyRelay(data.gpio, data.state, data.on_since)
         }
       
         if (data.type === 'online') {

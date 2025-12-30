@@ -23,11 +23,12 @@ DATA_FILE = "relay_data.json"
 data_lock = Lock()
 
 DEFAULT_DATA = {
-    "4":  {"name": "Relay GPIO 4",  "state": 0},
-    "5":  {"name": "Relay GPIO 5",  "state": 0},
-    "16": {"name": "Relay GPIO 16", "state": 0},
-    "17": {"name": "Relay GPIO 17", "state": 0},
+    "4":  {"name": "Relay GPIO 4",  "state": 0, "on_since": None},
+    "5":  {"name": "Relay GPIO 5",  "state": 0, "on_since": None},
+    "16": {"name": "Relay GPIO 16", "state": 0, "on_since": None},
+    "17": {"name": "Relay GPIO 17", "state": 0, "on_since": None},
 }
+
 
 def load_data():
     with data_lock:
@@ -72,11 +73,20 @@ def on_mqtt_message(client, userdata, msg):
     if topic == TOPIC_ONLINE:
         ESP32_ONLINE = payload == "online"
         LAST_SEEN = time.time()
+
+        if payload == "online":
+            db = load_data()
+            for gpio in db:
+                if db[gpio]["state"] == 1:
+                    db[gpio]["on_since"] = int(time.time())
+            save_data(db)
+
         push_event({
             "type": "online",
             "status": payload
         })
         return
+
 
 
     if topic == TOPIC_STATUS:
@@ -90,13 +100,24 @@ def on_mqtt_message(client, userdata, msg):
         db = load_data()
         if gpio in db:
             db[gpio]["state"] = value
+
+            if value == 1:
+                if not db[gpio].get("on_since"):
+                    db[gpio]["on_since"] = int(time.time())
+            else:
+                db[gpio]["on_since"] = None
+
             save_data(db)
 
             push_event({
                 "type": "relay",
                 "gpio": gpio,
-                "state": value
+                "state": value,
+                "on_since": db[gpio]["on_since"]
             })
+
+
+            
 # ===== ONLINE WATCHDOG =====
 def online_watchdog():
     global ESP32_ONLINE
@@ -127,10 +148,12 @@ def index():
 @app.route("/status")
 def status():
     online = ESP32_ONLINE and (time.time() - LAST_SEEN < 15)
+
     return jsonify({
         "esp32": "online" if online else "offline",
         "relays": load_data()
     })
+
 
 @app.route("/control", methods=["POST"])
 def control():
