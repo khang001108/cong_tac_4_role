@@ -307,7 +307,12 @@
         }
       
         if (data.type === 'online') {
-          document.getElementById('espStatus').textContent = '🟢 ESP32 Online'
+          const online = data.status === 'online'
+          document.getElementById('espStatus').textContent = online ? '🟢 ESP32 Online' : '🔴 ESP32 Offline'
+      
+          document.querySelectorAll('.switch input').forEach((cb) => {
+            cb.disabled = !online || !unlocked
+          })
         }
       
         if (data.type === 'rename') {

@@ -97,6 +97,16 @@ def on_mqtt_message(client, userdata, msg):
                 "gpio": gpio,
                 "state": value
             })
+# ===== ONLINE WATCHDOG =====
+def online_watchdog():
+    global ESP32_ONLINE
+    while True:
+        time.sleep(3)
+        if ESP32_ONLINE and time.time() - LAST_SEEN > 10:
+            ESP32_ONLINE = False
+            push_event({"type": "online", "status": "offline"})
+
+threading.Thread(target=online_watchdog, daemon=True).start()
 
 # ===== MQTT THREAD =====
 def mqtt_thread():
