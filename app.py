@@ -27,9 +27,9 @@ mqtt_client.on_message = on_message
 
 def init_mqtt():
     try:
-        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.connect_async(MQTT_BROKER, MQTT_PORT, 60)
         mqtt_client.loop_start()
-        print("MQTT init done")
+        print("MQTT init done (async)")
     except Exception as e:
         print("MQTT ERROR:", e)
 
