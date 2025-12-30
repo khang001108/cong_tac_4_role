@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, request, jsonify, render_template
 import paho.mqtt.publish as publish
 import os
 
@@ -9,17 +9,23 @@ TOPIC = "esp32/khazg/control"
 
 @app.route("/")
 def index():
-    return send_from_directory(".", "index.html")
+    return render_template("index.html")
 
-@app.route("/on")
-def on():
-    publish.single(TOPIC, "ON", hostname=MQTT_BROKER)
-    return "ON"
+@app.route("/control", methods=["POST"])
+def control():
+    data = request.json
+    gpio = data.get("gpio")
+    value = data.get("value")
 
-@app.route("/off")
-def off():
-    publish.single(TOPIC, "OFF", hostname=MQTT_BROKER)
-    return "OFF"
+    # gửi MQTT dạng: 4:1
+    msg = f"{gpio}:{value}"
+    publish.single(TOPIC, msg, hostname=MQTT_BROKER)
+
+    return jsonify({
+        "status": "ok",
+        "gpio": gpio,
+        "value": value
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
