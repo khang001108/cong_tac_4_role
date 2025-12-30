@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 Control</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f4f7;
+            padding: 20px;
+        }
+        button {
+            width: 120px;
+            height: 50px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h2>ESP32 GPIO Control</h2>
+
+<button onclick="setGPIO(4,1)">GPIO 4 ON</button>
+<button onclick="setGPIO(4,0)">GPIO 4 OFF</button><br>
+
+<button onclick="setGPIO(5,1)">GPIO 5 ON</button>
+<button onclick="setGPIO(5,0)">GPIO 5 OFF</button>
+
+<script>
+function setGPIO(gpio, value) {
+    fetch("/control", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            gpio: gpio,
+            value: value
+        })
+    });
+}
+</script>
+
+</body>
+</html>
