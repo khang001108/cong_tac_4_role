@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import paho.mqtt.client as mqtt
 import json
+import os
 
 MQTT_BROKER = "broker.emqx.io"
 MQTT_PORT = 1883
@@ -9,15 +10,12 @@ TOPIC_STATUS  = "esp32/khazg/status"
 
 app = Flask(__name__)
 
-mqtt_client = mqtt.Client(
-    mqtt.CallbackAPIVersion.VERSION2,
-    client_id="web_control_server"
-)
+mqtt_client = mqtt.Client(client_id="web_control_server")
 mqtt_connected = False
 
-def on_connect(client, userdata, flags, reason_code, properties):
+def on_connect(client, userdata, flags, rc):
     global mqtt_connected
-    print("MQTT connected:", reason_code)
+    print("MQTT connected:", rc)
     mqtt_connected = True
     client.subscribe(TOPIC_STATUS)
 
@@ -28,13 +26,13 @@ mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 
 def init_mqtt():
-    global mqtt_connected
-    if mqtt_connected:
-        return
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    mqtt_client.loop_start()
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.loop_start()
+        print("MQTT init done")
+    except Exception as e:
+        print("MQTT ERROR:", e)
 
-# 🔥 Flask 3.x: gọi trực tiếp
 init_mqtt()
 
 @app.route("/")
@@ -47,16 +45,13 @@ def control_gpio():
         return jsonify(ok=False, error="MQTT not connected"), 503
 
     data = request.json
-    payload = json.dumps({
-        "gpio": data["gpio"],
-        "value": data["value"]
-    })
-    mqtt_client.publish(TOPIC_CONTROL, payload)
+    mqtt_client.publish(TOPIC_CONTROL, json.dumps(data))
     return jsonify(ok=True)
 
 @app.route("/health")
 def health():
     return jsonify(web="ok", mqtt=mqtt_connected)
+
 if __name__ == "__main__":
-    print("Starting Flask dev server...")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
